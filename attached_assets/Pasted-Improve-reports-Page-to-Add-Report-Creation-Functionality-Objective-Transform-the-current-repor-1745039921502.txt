@@ -1,0 +1,109 @@
+Improve /reports Page to Add Report Creation Functionality
+🎯 Objective
+Transform the current /reports page into an interactive Sales Report Creator where users can:
+
+Generate custom reports for the entire agency or specific agents
+
+Add modular analytics/widgets to the report
+
+Export reports as PDF (client-ready)
+
+Keep UI consistent with the rest of the dashboard
+
+🪄 UI Design Guidelines
+Use the same layout, font, and spacing as other pages (p-6, rounded-lg, bg-white, text-gray-800)
+
+Align cards and charts in a grid layout (2 or 3 columns)
+
+Use existing color themes:
+
+Blue: Properties Sold
+
+Green: Revenue
+
+Amber: Average Price
+
+Purple: Days on Market
+
+🛠️ Functionality to Implement (Step-by-Step)
+1. Report Type Selection
+Add toggle or dropdown:
+
+Report for Agency (default)
+
+Report by Agent (dropdown list of agents)
+
+On agent selection, all charts and data adjust to reflect agent-specific metrics
+
+2. Time Range Filter
+Same options as dashboard:
+
+30 Days, 90 Days, 6 Months, 12 Months, Custom Range
+
+3. Widget Library (Drag or Add to Report)
+Create a library panel (sidebar or modal) where users can select which data widgets to include in the report:
+
+📊 Widget Options to Add:
+
+Total Properties Sold (with trend line)
+
+Total Revenue (line chart or value)
+
+Average Selling Price (value or bar chart)
+
+Average Days on Market
+
+Sales by Property Type (pie chart)
+
+Sales by Suburb (map or bar graph)
+
+Commission Earned
+
+Top 5 Sales (list with price and suburb)
+
+Agent Leaderboard (if generating agency-wide report)
+
+👉 Each widget should have:
+
+Add/Remove button
+
+Preview option
+
+Auto-align into printable report layout
+
+4. Report Preview Panel
+Real-time preview area on the right or below
+
+Shows selected widgets/cards in stacked layout
+
+Allow reordering widgets (drag & drop or up/down buttons)
+
+5. Report Title & Notes
+Input fields:
+
+Report Title
+
+Optional notes/description area (for comments or context)
+
+6. Export Options
+Export as PDF (Client-ready formatting)
+
+Save template (optional feature for repeat reports)
+
+🧩 Bonus Features to Consider
+Report Theme (light/dark toggle or logo color accents)
+
+Add your agency logo and contact info automatically to top of report
+
+Save/Reuse previous reports
+
+Share via email (optional integration)
+
+✅ Start With These Tasks
+Add dropdown to choose between Agency or Agent-Specific report
+
+Add a “+ Add Widget” button that opens the widget selection modal
+
+Display selected widgets in a responsive report preview grid
+
+Add “Export PDF” and “Generate Report” buttons (top right, styled consistently)

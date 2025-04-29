@@ -1,0 +1,1185 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { format, sub, parseISO } from "date-fns";
+import { insertAgentSchema, insertTransactionSchema } from "@shared/schema";
+import { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
+import { setupAuth } from "./auth";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication
+  setupAuth(app);
+  
+  // Configure multer for file uploads
+  const uploadDir = path.join(process.cwd(), 'public/uploads');
+
+  // Ensure upload directory exists
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  // Configure storage for uploaded files
+  const storage_config = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, 'profile-' + uniqueSuffix + ext);
+    }
+  });
+
+  // Create two different multer instances for different file types
+  const imageUpload = multer({ 
+    storage: storage_config,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp/;
+      const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
+      
+      if (ext && mimetype) {
+        return cb(null, true);
+      }
+      
+      cb(new Error('Only image files are allowed!') as any);
+    }
+  });
+  
+  // For CSV uploads - use memory storage instead of disk
+  const csvUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /csv/;
+      const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = /text\/csv|application\/vnd.ms-excel/.test(file.mimetype);
+      
+      if (ext || mimetype) {
+        return cb(null, true);
+      }
+      
+      cb(new Error('Only CSV files are allowed!') as any);
+    }
+  });
+  
+  // Serve static files from the public directory
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+  
+  // API routes - all prefixed with /api
+  
+  // Get sales statistics
+  app.get("/api/stats", async (req, res) => {
+    try {
+      const stats = await storage.getSalesStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ message: "Failed to fetch sales statistics" });
+    }
+  });
+  
+  // Update sales statistics
+  app.post("/api/stats/update", async (req, res) => {
+    try {
+      const stats = await storage.updateSalesStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error updating stats:", error);
+      res.status(500).json({ message: "Failed to update sales statistics" });
+    }
+  });
+  
+  // Get all agents
+  app.get("/api/agents", async (req, res) => {
+    try {
+      const agents = await storage.getAgents();
+      res.json(agents);
+    } catch (error) {
+      console.error("Error fetching agents:", error);
+      res.status(500).json({ message: "Failed to fetch agents" });
+    }
+  });
+  
+  // Get a specific agent
+  app.get("/api/agents/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid agent ID" });
+      }
+      
+      const agent = await storage.getAgent(id);
+      if (!agent) {
+        return res.status(404).json({ message: "Agent not found" });
+      }
+      
+      res.json(agent);
+    } catch (error) {
+      console.error("Error fetching agent:", error);
+      res.status(500).json({ message: "Failed to fetch agent" });
+    }
+  });
+  
+  // Create a new agent
+  app.post("/api/agents", async (req, res) => {
+    try {
+      const data = insertAgentSchema.parse(req.body);
+      const agent = await storage.createAgent(data);
+      res.status(201).json(agent);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error creating agent:", error);
+      res.status(500).json({ message: "Failed to create agent" });
+    }
+  });
+  
+  // Update an agent
+  app.patch("/api/agents/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid agent ID" });
+      }
+      
+      const data = insertAgentSchema.partial().parse(req.body);
+      const updatedAgent = await storage.updateAgent(id, data);
+      
+      if (!updatedAgent) {
+        return res.status(404).json({ message: "Agent not found" });
+      }
+      
+      res.json(updatedAgent);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error updating agent:", error);
+      res.status(500).json({ message: "Failed to update agent" });
+    }
+  });
+  
+  // Delete an agent
+  app.delete("/api/agents/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid agent ID" });
+      }
+      
+      const deleted = await storage.deleteAgent(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Agent not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      res.status(500).json({ message: "Failed to delete agent" });
+    }
+  });
+  
+  // Upload profile picture
+  app.post("/api/upload/profile", imageUpload.single('profileImage'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Return the path to the uploaded file
+      const filePath = `/uploads/${req.file.filename}`;
+      res.json({ 
+        success: true, 
+        filePath: filePath,
+        message: "File uploaded successfully"
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+  
+  // Delete profile picture
+  app.delete("/api/upload/profile", (req, res) => {
+    try {
+      const { filePath } = req.body;
+      
+      if (!filePath) {
+        return res.status(400).json({ message: "No file path provided" });
+      }
+      
+      // Get the filename from the path
+      const filename = path.basename(filePath);
+      const fullPath = path.join(uploadDir, filename);
+      
+      // Check if file exists
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+        res.json({ 
+          success: true, 
+          message: "File deleted successfully"
+        });
+      } else {
+        res.status(404).json({ 
+          success: false, 
+          message: "File not found"
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      res.status(500).json({ message: "Failed to delete file" });
+    }
+  });
+  
+  // Get all transactions with optional filtering
+  app.get("/api/transactions", async (req, res) => {
+    try {
+      const filters: any = {};
+      
+      // Parse filters from query parameters
+      if (req.query.agentId) {
+        filters.agentId = parseInt(req.query.agentId as string);
+      }
+      
+      if (req.query.propertyType) {
+        filters.propertyType = req.query.propertyType as string;
+      }
+      
+      if (req.query.status) {
+        filters.status = req.query.status as string;
+      }
+      
+      if (req.query.dateFrom) {
+        filters.dateFrom = parseISO(req.query.dateFrom as string);
+      }
+      
+      if (req.query.dateTo) {
+        filters.dateTo = parseISO(req.query.dateTo as string);
+      }
+      
+      // Apply date range filters based on predefined periods
+      if (req.query.period) {
+        const now = new Date();
+        
+        switch (req.query.period) {
+          case "30days":
+            filters.dateFrom = sub(now, { days: 30 });
+            break;
+          case "90days":
+            filters.dateFrom = sub(now, { days: 90 });
+            break;
+          case "6months":
+            filters.dateFrom = sub(now, { months: 6 });
+            break;
+          case "12months":
+            filters.dateFrom = sub(now, { months: 12 });
+            break;
+        }
+        
+        filters.dateTo = now;
+      }
+      
+      let transactions = await storage.getTransactions(filters);
+      
+      // Handle search
+      if (req.query.search) {
+        const searchTerm = (req.query.search as string).toLowerCase();
+        transactions = transactions.filter(transaction => 
+          (transaction.propertyAddress?.toLowerCase().includes(searchTerm) || false) || 
+          (transaction.propertySuburb?.toLowerCase().includes(searchTerm) || false) ||
+          (transaction.agentName?.toLowerCase().includes(searchTerm) || false)
+        );
+      }
+      
+      // Handle sorting
+      const sortBy = (req.query.sortBy as string) || 'id';
+      const sortDirection = (req.query.sortDirection as string) || 'asc';
+      
+      transactions.sort((a, b) => {
+        let comparison = 0;
+        
+        // Determine how to compare based on the field
+        if (sortBy === 'id') {
+          comparison = a.id - b.id;
+        } else if (sortBy === 'price') {
+          try {
+            const priceA = parseFloat((a.price || '0').replace(/[^0-9.-]+/g, '') || '0');
+            const priceB = parseFloat((b.price || '0').replace(/[^0-9.-]+/g, '') || '0');
+            comparison = priceA - priceB;
+          } catch (err) {
+            comparison = 0;
+          }
+        } else if (sortBy === 'propertyAddress') {
+          if (a.propertyAddress && b.propertyAddress) {
+            comparison = a.propertyAddress.localeCompare(b.propertyAddress);
+          }
+        } else if (sortBy === 'listedDate') {
+          try {
+            const dateA = a.listedDate ? new Date(a.listedDate).getTime() : 0;
+            const dateB = b.listedDate ? new Date(b.listedDate).getTime() : 0;
+            comparison = dateA - dateB;
+          } catch (err) {
+            comparison = 0;
+          }
+        }
+        
+        // Reverse for descending order
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+      
+      // Handle pagination
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      
+      const paginatedTransactions = transactions.slice(startIndex, endIndex);
+      
+      res.json({
+        total: transactions.length,
+        page,
+        pageSize,
+        data: paginatedTransactions
+      });
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+  });
+  
+  // Get a specific transaction
+  app.get("/api/transactions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid transaction ID" });
+      }
+      
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      res.status(500).json({ message: "Failed to fetch transaction" });
+    }
+  });
+  
+  // Create a new transaction
+  app.post("/api/transactions", async (req, res) => {
+    try {
+      const data = insertTransactionSchema.parse(req.body);
+      const transaction = await storage.createTransaction(data);
+      res.status(201).json(transaction);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error creating transaction:", error);
+      res.status(500).json({ message: "Failed to create transaction" });
+    }
+  });
+  
+  // Update a transaction
+  app.patch("/api/transactions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid transaction ID" });
+      }
+      
+      const data = insertTransactionSchema.partial().parse(req.body);
+      const updatedTransaction = await storage.updateTransaction(id, data);
+      
+      if (!updatedTransaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      res.json(updatedTransaction);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error updating transaction:", error);
+      res.status(500).json({ message: "Failed to update transaction" });
+    }
+  });
+  
+  // Delete a transaction
+  app.delete("/api/transactions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid transaction ID" });
+      }
+      
+      const deleted = await storage.deleteTransaction(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      res.status(500).json({ message: "Failed to delete transaction" });
+    }
+  });
+  
+  // Get property transactions for table display
+  app.get("/api/property-transactions", async (req, res) => {
+    try {
+      // We're using the same transactions data but formatting it differently for the property table
+      const transactions = await storage.getTransactions();
+      
+      // Format transactions for property table view
+      const propertyTransactions = transactions.map(transaction => ({
+        address: transaction.propertyAddress,
+        suburb: transaction.propertySuburb,
+        type: transaction.propertyType,
+        office: "MAWSON", // Default office
+        agent: transaction.agentName,
+        unsold: transaction.status === "Unsold" ? "YES" : "NO",
+        removeFromMrkt: "",
+        mdUse: "",
+        officeRef: "",
+        soldPrice: transaction.price,
+        underContract: transaction.transactionDate ? format(new Date(transaction.transactionDate), "dd/MM/yy") : "",
+        settlementDate: transaction.transactionDate ? format(new Date(new Date(transaction.transactionDate).getTime() + 30*24*60*60*1000), "dd/MM/yy") : "",
+        incGst: "YES",
+        comm: `$${Math.round(parseFloat(transaction.price.replace(/[^0-9.]/g, '')) * 0.025).toLocaleString()}`,
+        officeLead: Math.random() > 0.5 ? "YES" : "NO",
+        saleType: transaction.status === "Auction" ? "Auction" : "Private Treaty",
+        dom: Math.floor(Math.random() * 30 + 10).toString(),
+        trafficLights: "YES",
+        ojc: ["O", "J", "C", "O/J", "J/C", "O/C"][Math.floor(Math.random() * 6)],
+        rental: "NO"
+      }));
+      
+      res.json(propertyTransactions);
+    } catch (error) {
+      console.error("Error fetching property transactions:", error);
+      res.status(500).json({ message: "Failed to fetch property transactions" });
+    }
+  });
+  
+  // Get agent commission data
+  app.get("/api/charts/agent-commission", async (req, res) => {
+    try {
+      const agents = await storage.getAgents();
+      const transactions = await storage.getTransactions();
+      
+      // Calculate commission data for each agent
+      const agentCommissionData = agents.map(agent => {
+        const agentTransactions = transactions.filter(t => t.agentId === agent.id);
+        const totalCommission = agentTransactions.reduce((sum, t) => {
+          const price = parseFloat(t.price.replace(/[^0-9.]/g, ''));
+          return sum + (price * 0.025); // 2.5% commission rate
+        }, 0);
+        
+        return {
+          name: agent.name,
+          listings: agentTransactions.length,
+          totalCommission: Math.round(totalCommission),
+          averageCommission: agentTransactions.length > 0 ? Math.round(totalCommission / agentTransactions.length) : null,
+          commissionPercent: 2.5, // Fixed percentage
+          auctionPercent: Math.floor(Math.random() * 30 + 20), // Random percentage between 20-50%
+          totalAdminFee: Math.round(totalCommission * 0.1) // 10% admin fee
+        };
+      });
+      
+      res.json(agentCommissionData);
+    } catch (error) {
+      console.error("Error fetching agent commission data:", error);
+      res.status(500).json({ message: "Failed to fetch agent commission data" });
+    }
+  });
+  
+  // Import Excel data
+  app.post("/api/import", async (req, res) => {
+    try {
+      const { data } = req.body;
+      
+      if (!Array.isArray(data) || data.length === 0) {
+        return res.status(400).json({ message: "Invalid data format. Expected array of transactions." });
+      }
+      
+      const success = await storage.importExcelData(data);
+      
+      if (success) {
+        res.json({ message: "Data imported successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to import data" });
+      }
+    } catch (error) {
+      console.error("Error importing data:", error);
+      res.status(500).json({ message: "Failed to import data" });
+    }
+  });
+  
+  // Import Google Sheet data
+  app.post("/api/import/google-sheet", async (req, res) => {
+    try {
+      const { url, apiKey } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ message: "Missing Google Sheet URL" });
+      }
+      
+      if (!apiKey) {
+        return res.status(400).json({ message: "Missing Google API key. This is required to access Google Sheets." });
+      }
+      
+      // Extract the sheet ID from the URL
+      let sheetId;
+      try {
+        const regex = /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+        const match = url.match(regex);
+        if (match && match[1]) {
+          sheetId = match[1];
+        } else {
+          return res.status(400).json({ message: "Invalid Google Sheet URL format" });
+        }
+      } catch (error) {
+        return res.status(400).json({ message: "Failed to extract sheet ID from URL" });
+      }
+      
+      // Use the Google Sheets API to fetch the data
+      const { google } = require('googleapis');
+      const sheets = google.sheets({ version: 'v4', auth: apiKey });
+      
+      try {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: 'Sheet1!A:Z', // Adjust range as needed
+        });
+        
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) {
+          return res.status(404).json({ message: "No data found in the Google Sheet" });
+        }
+        
+        // Convert to JSON format with the first row as headers
+        const headers = rows[0];
+        const jsonData = rows.slice(1).map((row: any) => {
+          const item: any = {};
+          headers.forEach((header: string, i: number) => {
+            item[header] = row[i] || '';
+          });
+          return item;
+        });
+        
+        // Import the data
+        const success = await storage.importExcelData(jsonData);
+        
+        if (success) {
+          res.json({ message: "Data imported successfully from Google Sheet" });
+        } else {
+          res.status(500).json({ message: "Failed to import data" });
+        }
+      } catch (apiError: any) {
+        console.error("Google Sheets API error:", apiError);
+        res.status(401).json({
+          message: "Failed to access Google Sheet. Please check your API key and ensure the sheet is publicly accessible.",
+          error: apiError.message
+        });
+      }
+    } catch (error: any) {
+      console.error("Error importing from Google Sheet:", error);
+      res.status(500).json({ 
+        message: "Failed to import data from Google Sheet",
+        error: error.message
+      });
+    }
+  });
+  
+  // Export data as CSV
+  app.get("/api/export/csv", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      if (!transactions || transactions.length === 0) {
+        return res.status(404).json({ message: "No data available to export" });
+      }
+      
+      // Convert to CSV format
+      const createCsvStringifier = require('csv-writer').createObjectCsvStringifier;
+      
+      const csvStringifier = createCsvStringifier({
+        header: [
+          { id: 'id', title: 'ID' },
+          { id: 'propertyAddress', title: 'Property Address' },
+          { id: 'propertySuburb', title: 'Suburb' },
+          { id: 'propertyPostcode', title: 'Postcode' },
+          { id: 'propertyType', title: 'Property Type' },
+          { id: 'price', title: 'Price' },
+          { id: 'transactionDate', title: 'Transaction Date' },
+          { id: 'listedDate', title: 'Listed Date' },
+          { id: 'status', title: 'Status' },
+          { id: 'agentId', title: 'Agent ID' }
+        ]
+      });
+      
+      const csvHeader = csvStringifier.getHeaderString();
+      const csvBody = csvStringifier.stringifyRecords(transactions);
+      const csvContent = csvHeader + csvBody;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=transactions.csv');
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      res.status(500).json({ message: "Failed to export data as CSV" });
+    }
+  });
+  
+  // Export data as Excel
+  app.get("/api/export/excel", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      const agents = await storage.getAgents();
+      
+      if (!transactions || transactions.length === 0) {
+        return res.status(404).json({ message: "No data available to export" });
+      }
+      
+      // Create Excel workbook
+      const Excel = require('exceljs');
+      const workbook = new Excel.Workbook();
+      
+      // Add transactions worksheet
+      const transactionsWorksheet = workbook.addWorksheet('Transactions');
+      transactionsWorksheet.columns = [
+        { header: 'ID', key: 'id', width: 10 },
+        { header: 'Property Address', key: 'propertyAddress', width: 30 },
+        { header: 'Suburb', key: 'propertySuburb', width: 20 },
+        { header: 'Postcode', key: 'propertyPostcode', width: 15 },
+        { header: 'Property Type', key: 'propertyType', width: 15 },
+        { header: 'Price', key: 'price', width: 15 },
+        { header: 'Transaction Date', key: 'transactionDate', width: 20 },
+        { header: 'Listed Date', key: 'listedDate', width: 20 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Agent ID', key: 'agentId', width: 10 }
+      ];
+      
+      // Add agents worksheet
+      const agentsWorksheet = workbook.addWorksheet('Agents');
+      agentsWorksheet.columns = [
+        { header: 'ID', key: 'id', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Phone', key: 'phone', width: 20 }
+      ];
+      
+      // Add data to worksheets
+      transactionsWorksheet.addRows(transactions);
+      agentsWorksheet.addRows(agents);
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=belle_property_data.xlsx');
+      
+      // Send the workbook to the client
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting Excel:", error);
+      res.status(500).json({ message: "Failed to export data as Excel" });
+    }
+  });
+  
+  // Get monthly sales data for charts
+  app.get("/api/charts/monthly-sales", async (req, res) => {
+    try {
+      // Get transactions from last 12 months
+      const now = new Date();
+      const lastYear = sub(now, { months: 12 });
+      
+      const transactions = await storage.getTransactions({
+        dateFrom: lastYear,
+        dateTo: now
+      });
+      
+      // Group by month and calculate sales counts and revenue
+      const monthlyData: Record<string, { sales: number, revenue: number }> = {};
+      
+      // Initialize all months
+      for (let i = 0; i < 12; i++) {
+        const date = sub(now, { months: i });
+        const month = format(date, 'MMM');
+        monthlyData[month] = { sales: 0, revenue: 0 };
+      }
+      
+      // Fill in actual data
+      for (const transaction of transactions) {
+        // Handle both string dates and Date objects safely
+        const transactionDate = transaction.transactionDate instanceof Date 
+          ? transaction.transactionDate 
+          : new Date(transaction.transactionDate);
+          
+        // Only process if it's a valid date
+        if (!isNaN(transactionDate.getTime())) {
+          const month = format(transactionDate, 'MMM');
+        
+          if (monthlyData[month]) {
+            monthlyData[month].sales += 1;
+            monthlyData[month].revenue += Number(transaction.price) / 1000000; // Convert to millions
+          }
+        }
+      }
+      
+      // Convert to arrays for charting
+      const months = Object.keys(monthlyData).reverse();
+      const salesData = months.map(month => monthlyData[month].sales);
+      const revenueData = months.map(month => Number(monthlyData[month].revenue.toFixed(2)));
+      
+      res.json({
+        months,
+        salesData,
+        revenueData
+      });
+    } catch (error) {
+      console.error("Error fetching monthly sales data:", error);
+      res.status(500).json({ message: "Failed to fetch monthly sales data" });
+    }
+  });
+  
+  // Get property type distribution for pie chart
+  app.get("/api/charts/property-types", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      const propertyTypes: Record<string, number> = {};
+      
+      for (const transaction of transactions) {
+        const type = transaction.propertyType;
+        propertyTypes[type] = (propertyTypes[type] || 0) + 1;
+      }
+      
+      const labels = Object.keys(propertyTypes);
+      const data = labels.map(label => propertyTypes[label]);
+      
+      res.json({
+        labels,
+        data
+      });
+    } catch (error) {
+      console.error("Error fetching property type data:", error);
+      res.status(500).json({ message: "Failed to fetch property type data" });
+    }
+  });
+  
+  // Get agent performance data
+  app.get("/api/charts/agent-performance", async (req, res) => {
+    try {
+      const agents = await storage.getAgents();
+      const transactions = await storage.getTransactions();
+      
+      const agentPerformance: Record<number, { name: string, sales: number }> = {};
+      
+      // Initialize all agents
+      for (const agent of agents) {
+        agentPerformance[agent.id] = { name: agent.name, sales: 0 };
+      }
+      
+      // Count sales per agent
+      for (const transaction of transactions) {
+        if (agentPerformance[transaction.agentId]) {
+          agentPerformance[transaction.agentId].sales += 1;
+        }
+      }
+      
+      // Convert to arrays and sort by sales
+      const agentData = Object.values(agentPerformance)
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5); // Top 5 agents
+      
+      const labels = agentData.map(a => a.name);
+      const data = agentData.map(a => a.sales);
+      
+      res.json({
+        labels,
+        data
+      });
+    } catch (error) {
+      console.error("Error fetching agent performance data:", error);
+      res.status(500).json({ message: "Failed to fetch agent performance data" });
+    }
+  });
+  
+  // Get price range distribution
+  app.get("/api/charts/price-ranges", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      const priceRanges = {
+        "<$400k": 0,
+        "$400k-$500k": 0,
+        "$500k-$600k": 0,
+        "$600k-$700k": 0,
+        "$700k-$800k": 0,
+        ">$800k": 0
+      };
+      
+      for (const transaction of transactions) {
+        const price = Number(transaction.price);
+        
+        if (price < 400000) {
+          priceRanges["<$400k"] += 1;
+        } else if (price < 500000) {
+          priceRanges["$400k-$500k"] += 1;
+        } else if (price < 600000) {
+          priceRanges["$500k-$600k"] += 1;
+        } else if (price < 700000) {
+          priceRanges["$600k-$700k"] += 1;
+        } else if (price < 800000) {
+          priceRanges["$700k-$800k"] += 1;
+        } else {
+          priceRanges[">$800k"] += 1;
+        }
+      }
+      
+      const labels = Object.keys(priceRanges);
+      const data = labels.map(label => priceRanges[label as keyof typeof priceRanges]);
+      
+      res.json({
+        labels,
+        data
+      });
+    } catch (error) {
+      console.error("Error fetching price range data:", error);
+      res.status(500).json({ message: "Failed to fetch price range data" });
+    }
+  });
+  
+  // Get location distribution
+  app.get("/api/charts/locations", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      const locations: Record<string, number> = {};
+      
+      for (const transaction of transactions) {
+        const suburb = transaction.propertySuburb;
+        locations[suburb] = (locations[suburb] || 0) + 1;
+      }
+      
+      // Get top 5 locations and group others
+      const sortedLocations = Object.entries(locations)
+        .sort((a, b) => b[1] - a[1]);
+      
+      const top5 = sortedLocations.slice(0, 4);
+      
+      const otherCount = sortedLocations
+        .slice(4)
+        .reduce((sum, [_, count]) => sum + count, 0);
+      
+      const labels = [...top5.map(([location]) => location), "Other Areas"];
+      const data = [...top5.map(([_, count]) => count), otherCount];
+      
+      res.json({
+        labels,
+        data
+      });
+    } catch (error) {
+      console.error("Error fetching location data:", error);
+      res.status(500).json({ message: "Failed to fetch location data" });
+    }
+  });
+  
+  // Settings API endpoints
+  
+  // Get all settings
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const settings = await storage.getAllSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+  
+  // Get settings by category
+  app.get("/api/settings/category/:category", async (req, res) => {
+    try {
+      const category = req.params.category;
+      if (!category) {
+        return res.status(400).json({ message: "Category is required" });
+      }
+      
+      const settings = await storage.getSettingsByCategory(category);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings by category:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+  
+  // Get a specific setting
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const key = req.params.key;
+      if (!key) {
+        return res.status(400).json({ message: "Setting key is required" });
+      }
+      
+      const setting = await storage.getSetting(key);
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("Error fetching setting:", error);
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+  
+  // Update or create a setting
+  app.post("/api/settings", async (req, res) => {
+    try {
+      const { key, value, category } = req.body;
+      
+      if (!key || value === undefined) {
+        return res.status(400).json({ message: "Key and value are required" });
+      }
+      
+      const setting = await storage.updateSetting(key, value, category);
+      res.status(200).json(setting);
+    } catch (error) {
+      console.error("Error updating setting:", error);
+      res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+  
+  // Upload company logo
+  app.post("/api/upload/logo", imageUpload.single('logo'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Return the path to the uploaded file
+      const filePath = `/uploads/${req.file.filename}`;
+      
+      // Save the logo path in settings
+      storage.updateSetting('company_logo', filePath, 'branding');
+      
+      res.json({ 
+        success: true, 
+        filePath: filePath,
+        message: "Logo uploaded successfully"
+      });
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+      res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
+  // Template download endpoint
+  app.get('/api/template/csv', (req, res) => {
+    try {
+      const headers = 'propertyAddress,propertySuburb,propertyType,price,status,listedDate,soldDate,agentName,description,bedrooms,bathrooms\n';
+      const sampleRow = '123 Main St,Sydney,House,850000,Sold,2023-01-01,2023-01-15,John Smith,Beautiful family home in prime location,4,2\n';
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="property_template.csv"');
+      res.send(headers + sampleRow);
+    } catch (error) {
+      console.error('Error generating template:', error);
+      res.status(500).json({ message: 'Failed to generate template' });
+    }
+  });
+
+  // CSV Import endpoint
+  app.post('/api/import/csv', csvUpload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded' });
+      }
+
+      const fileData = req.file.buffer.toString('utf8');
+      const rows = fileData.split('\n');
+      
+      // Skip header row and process data
+      const dataRows = rows.slice(1).filter(row => row.trim()).map(row => {
+        const columns = row.split(',');
+        return {
+          propertyAddress: columns[0],
+          propertySuburb: columns[1],
+          propertyState: columns[2],
+          propertyPostcode: columns[3],
+          propertyType: columns[4],
+          price: columns[5],
+          status: columns[6],
+          listedDate: columns[7],
+          soldDate: columns[8],
+          agentName: columns[9],
+          description: columns[10],
+          bedrooms: columns[11],
+          bathrooms: columns[12],
+          carSpaces: columns[13],
+          landSize: columns[14],
+          buildingSize: columns[15],
+        };
+      });
+      
+      // Process each row and insert into database
+      if (dataRows.length > 0) {
+        const importResults = await storage.importExcelData(dataRows);
+        res.json({ success: true, message: `Imported ${dataRows.length} records successfully` });
+      } else {
+        res.json({ success: false, message: 'No data found in the CSV file' });
+      }
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Import failed' 
+      });
+    }
+  });
+
+  // CSV Export endpoint
+  app.get('/api/export/transactions/csv', async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      // Format data for CSV
+      const headers = 'propertyAddress,propertySuburb,propertyState,propertyType,price,status,listedDate,soldDate,agentName,description,bedrooms,bathrooms,carSpaces,landSize,buildingSize\n';
+      const rows = transactions.map(t => 
+        `${t.propertyAddress || ''},${t.propertySuburb || ''},"",${t.propertyType || ''},${t.price || ''},${t.status || ''},${t.listedDate ? new Date(t.listedDate).toISOString().split('T')[0] : ''},${t.transactionDate ? new Date(t.transactionDate).toISOString().split('T')[0] : ''},${t.agentName || ''},"",${t.bedrooms || ''},${t.bathrooms || ''},"","",""`
+      ).join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
+      res.send(headers + rows);
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      res.status(500).json({ message: 'Failed to export transactions' });
+    }
+  });
+
+  // Super Admin middleware
+  const isSuperAdmin = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ message: "Forbidden: Super Admin access required" });
+    }
+    
+    next();
+  };
+  
+  // Super Admin API routes
+  
+  // Get all agencies
+  app.get("/api/super-admin/agencies", isSuperAdmin, async (req, res) => {
+    try {
+      // Get all agencies from the database
+      // This is a placeholder - in reality you would query the database for this
+      const agencies = await storage.getAllAgencies();
+      
+      res.json(agencies);
+    } catch (error) {
+      console.error("Error fetching agencies:", error);
+      res.status(500).json({ message: "Failed to fetch agencies" });
+    }
+  });
+  
+  // Create a new agency
+  app.post("/api/super-admin/agencies", isSuperAdmin, async (req, res) => {
+    try {
+      // Validate required fields
+      const { name, contactName, contactEmail } = req.body;
+      
+      if (!name || !contactName || !contactEmail) {
+        return res.status(400).json({ 
+          message: "Agency name, contact name, and contact email are required" 
+        });
+      }
+      
+      // Optional fields
+      const { contactPhone, rlaNumber, logoUrl, active } = req.body;
+      
+      // Create the agency
+      const newAgency = await storage.createAgency({
+        name,
+        contactName,
+        contactEmail,
+        contactPhone,
+        rlaNumber,
+        logoUrl,
+        active: active !== undefined ? active : true
+      });
+      
+      res.status(201).json(newAgency);
+    } catch (error) {
+      console.error("Error creating agency:", error);
+      res.status(500).json({ message: "Failed to create agency" });
+    }
+  });
+  
+  // Update agency status (activate/deactivate)
+  app.patch("/api/super-admin/agencies/:id/toggle-active", isSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid agency ID" });
+      }
+      
+      const { active } = req.body;
+      if (typeof active !== 'boolean') {
+        return res.status(400).json({ message: "Active status must be a boolean" });
+      }
+      
+      // Update agency in the database
+      const updatedAgency = await storage.updateAgency(id, { active });
+      
+      if (!updatedAgency) {
+        return res.status(404).json({ message: "Agency not found" });
+      }
+      
+      res.json(updatedAgency);
+    } catch (error) {
+      console.error("Error updating agency:", error);
+      res.status(500).json({ message: "Failed to update agency" });
+    }
+  });
+  
+  // Get all properties across all agencies
+  app.get("/api/super-admin/properties", isSuperAdmin, async (req, res) => {
+    try {
+      // This would query the database for all properties across all agencies
+      const properties = await storage.getAllTransactions();
+      
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}

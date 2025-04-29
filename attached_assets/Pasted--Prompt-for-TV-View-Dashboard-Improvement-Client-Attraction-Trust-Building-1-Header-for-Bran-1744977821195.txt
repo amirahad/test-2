@@ -1,0 +1,50 @@
+📺 Prompt for TV View Dashboard Improvement (Client Attraction & Trust Building)
+
+1. Header for Branding (Essential)Clearly include:
+
+Agency Logo (top-left corner, moderate size, clear visibility)
+
+Agency Name (next to logo, clear font, bold, easily readable from distance)
+
+2. UI/Design Improvements
+
+Keep consistent rounded corners and clear padding (p-8) in widgets/cards.
+
+Clearly use subtle gradients within each widget, rather than plain solid colors, for a more professional look.
+
+Slightly reduce font sizes of metric numbers to balance clarity and elegance.
+
+Clearly include subtle shadows (shadow-xl) behind widgets for a more attractive appearance.
+
+3. Analytics to Clearly Display (Client-Centric & Attractive)These should immediately highlight the agency’s strengths clearly and positively:
+
+Properties Sold (This Month & Year-to-Date; clearly indicates agency success)
+
+Total Sales Revenue (This Month; conveys strong agency market presence)
+
+Average Selling Price (Recent Settlements; demonstrates agency handling premium properties)
+
+Average Days on Market (Shorter duration impresses potential clients)
+
+4. Optional Analytics to Add (Consider clearly if data reflects positively)
+
+Client Satisfaction (clearly show as a high percentage or star rating, if available)
+
+Recent Notable Sales (Clearly cycle through high-profile property images with sold prices)
+
+Top Suburbs (Highlight suburbs where the agency frequently sells, building local expertise credibility)
+
+5. Alignment with Other Dashboard Pages
+
+Maintain consistent typography (fonts, sizes) and color themes (primary colors: blue, green, gold, purple)
+
+Maintain UI consistency, ensuring TV dashboard uses same style as the internal dashboard but clearly simplified for client viewing.
+
+6. Visual Enhancements for Attractiveness
+
+Add subtle transition animations between data refreshes for smooth and visually appealing experience.
+
+Ensure data clearly auto-refreshes (every 30 min) without noticeable disruptions.
+
+Clearly indicate timestamp with a gentle note such as "Updated just now" or "Live Data."
+

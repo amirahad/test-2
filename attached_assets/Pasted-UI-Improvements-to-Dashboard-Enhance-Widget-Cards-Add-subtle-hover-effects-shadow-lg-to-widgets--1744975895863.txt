@@ -1,0 +1,57 @@
+UI Improvements to Dashboard:
+Enhance Widget Cards
+
+Add subtle hover effects (shadow-lg) to widgets to improve interactivity.
+
+Adjust padding inside widgets to p-6 for cleaner spacing.
+
+Analytics Tabs
+
+Make sure the tabs ("Overview," "Property Analytics," "Agent Performance," "Suburb Analysis," "Pricing Trends") have clear active/inactive styling for better visibility.
+
+Active tabs should have a distinct underline and bold text.
+
+Property Transactions Table
+
+Add a clear sorting indicator (ascending/descending icons) next to sortable table columns.
+
+Highlight transaction statuses ("Sold," "Under Offer," "Pending," "Settled") with colored badges for clarity:
+
+Sold: Green badge
+
+Under Offer/Pending: Orange badge
+
+Settled: Blue badge
+
+Implement alternating row colors (bg-gray-50 for even rows).
+
+Search and Filter Bar
+
+Enhance search input by adding a clear placeholder: "Search properties by address, suburb, or agent...".
+
+Place the "Refresh" and "Export" buttons neatly aligned at the right end of the filter row.
+
+Sidebar Navigation
+
+Highlight the active page clearly in the sidebar (Dashboard active state).
+
+🛠️ Prompts for Functional Filters and Buttons
+1. Date Range Filter Implementation:
+Prompt:
+"Implement functionality for 'Date Range' dropdown filter to dynamically fetch and display data based on selected time periods (Last 7 Days, Last 30 Days, Last Quarter, Last Year, Custom Range). Use React Query for efficient data fetching and automatic UI updates."
+
+2. Property Type Filter Implementation:
+Prompt:
+"Add logic to the 'Property Type' filter dropdown to correctly filter dashboard data by property category (All Properties, Houses, Apartments, Townhouses, Land). Ensure selections immediately update displayed widgets and transactions using React Query."
+
+3. Sales Agent Filter Implementation:
+Prompt:
+"Implement 'Sales Agent' dropdown filter functionality. Selecting an agent should dynamically update widgets, metrics, and property transaction data. Integrate with backend API endpoints to filter agent-specific data clearly."
+
+4. Refresh Button Functionality:
+Prompt:
+"Implement functionality for the 'Refresh' button to instantly re-fetch and update dashboard analytics and property transactions data without reloading the entire page. Show a subtle loading indicator during data refresh (use React Query refetch methods)."
+
+5. Export Button Functionality:
+Prompt:
+"Implement the 'Export' button functionality to allow users to download displayed property transaction data as a CSV file. Ensure exported data reflects currently applied filters (date range, property type, agent). Generate the file on-demand using backend Express.js endpoints."

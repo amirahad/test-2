@@ -1,0 +1,90 @@
+🛠 Prompt to Improve "Add New Property" Modal
+Currently provided fields:
+
+Property Address
+
+Suburb
+
+Postcode
+
+Property Type
+
+Price
+
+Agent
+
+Status
+
+Bedrooms
+
+Bathrooms
+
+Additional required fields for improved analytics:
+
+Listing Date (Date picker)
+
+Contract Date (Date picker; optional, if status is under offer or sold)
+
+Settlement Date (Date picker; optional, required if status is sold or settled)
+
+Land Area (sqm) (Number)
+
+Building Area (sqm) (Number; optional)
+
+Sale Type (Dropdown: Auction, Private Treaty, Expression of Interest)
+
+Seller Source (Dropdown: Referral, Walk-in, Online, Repeat Client, Prospecting)
+
+Buyer Source (Dropdown: Referral, Walk-in, Online, Repeat Client, Prospecting; optional but recommended)
+
+Marketing Spend (Number; optional)
+
+Property Description/Notes (Textarea, optional)
+
+Clearly mark required fields with an asterisk (*) and provide validation before submission.
+
+🎨 Prompt to Improve UI on "/properties" Page
+Table Layout Enhancements:
+
+Clearly align headers and rows with consistent padding (px-4 py-3).
+
+Add sortable icons clearly next to column headers (e.g., Address, Price, Listed Date).
+
+Improve the visibility of pagination buttons ("Previous" & "Next") by clearly styling them (use primary blue color).
+
+Search & Filters:
+
+Clearly add a visible placeholder to search input: "Search properties by address, suburb, postcode or agent...".
+
+Improve Filters and Sort buttons with outlined style, consistent colors, rounded corners, and subtle shadow on hover.
+
+Property Status & Types:
+
+Use colored badges clearly for property statuses:
+
+Settled (Green), Pending/Under Offer (Orange), Listed (Blue), Cancelled/Withdrawn (Red).
+
+Clearly display Property Types in colored labels (Houses, Apartments, Townhouses, Land) with consistent colors:
+
+Houses: Blue
+
+Apartments: Purple
+
+Townhouses: Green
+
+Land: Yellow
+
+"Add Property" Button:
+
+Keep this button prominent (top-right aligned), clearly styled in primary color (blue), with subtle hover effect (shadow-md).
+
+🎯 Prompt to Ensure Consistency with Dashboard UI Theme
+Maintain consistency with dashboard UI using:
+
+Background: Neutral whites/light grays (bg-gray-50 or bg-white)
+
+Primary accent colors: Blue (bg-blue-600), Green (bg-green-500), Red (bg-red-500), Orange (bg-orange-500)
+
+Fonts: Use clear typography (font-medium, font-semibold), consistent sizing (text-sm for table content, text-lg for headings), and colors (text-gray-700, text-gray-900)
+
+Cards and modals: Rounded corners (rounded-lg), clear shadows (shadow-lg), and consistent padding (p-6)

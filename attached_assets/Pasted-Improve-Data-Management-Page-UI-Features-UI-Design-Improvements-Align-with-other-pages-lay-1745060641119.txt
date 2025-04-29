@@ -1,0 +1,75 @@
+Improve Data Management Page (UI + Features)
+🎨 UI & Design Improvements
+Align with other pages’ layout and color scheme:
+
+Set consistent padding (p-6) and spacing across all components.
+
+Use white background for cards (bg-white) with soft shadow (shadow-md) and rounded corners (rounded-lg).
+
+Apply consistent button styles (bg-blue-600, text-white, hover:bg-blue-700) as used in other pages (e.g., Reports, Properties).
+
+Headers and section spacing:
+
+Add clear headers: “📥 Import Data” and “📤 Export Data”.
+
+Use larger headings (text-lg font-semibold text-gray-800) and smaller description texts (text-sm text-gray-500).
+
+Add dividers (border-b border-gray-200 my-4) between sections for visual clarity.
+
+🧠 Feature Improvements & Functional Enhancements
+✅ Import Section (Simplify & Enhance)
+Current Options:
+
+Excel/CSV
+
+Google Sheets (via API key)
+
+Suggestions:
+
+✅ Keep Excel/CSV Upload (primary method for users)
+
+❌ Remove Google Sheets import via API key — it adds unnecessary complexity for non-technical users
+
+Additions:
+
+📄 Template Download Button (e.g., “Download Sample Template”) to guide data formatting before upload
+
+✅ Smart Import Preview:
+
+Show a preview table after file upload (first 5–10 rows)
+
+Allow user to confirm before saving
+
+🛠 Data Validation with Error Highlighting:
+
+Highlight missing or incorrect columns
+
+Show friendly error messages and how to fix them
+
+✅ Export Section (Improve Usability)
+Merge “Export as CSV” and “Export as Excel” into a single dropdown button:
+👉 "Export ▼" → CSV / Excel / PDF
+
+Allow filtering before export:
+
+Add filters like Date Range, Property Type, Agent, Status (same as dashboard)
+
+Show filter summary before export
+
+💡 Bonus Features
+🔄 Data Sync Log section:
+
+Show last 5 uploads with timestamps, file names, and status (Success/Failed)
+
+📥 Scheduled Imports (Optional):
+
+Let users set daily or weekly import jobs (from saved source like Dropbox or Google Drive)
+
+✅ Tasks to Start With
+Remove Google Sheets import option.
+
+Add import preview step and validation.
+
+Redesign buttons and section spacing using same styles as dashboard/reports page.
+
+Add sample template download and recent upload log section.

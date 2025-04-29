@@ -1,0 +1,73 @@
+Dashboard Page UI Adjustments & Analytics Integration
+
+Current Dashboard Issues (to be fixed):
+
+The current layout is misaligned, visually cluttered, and widgets don't look balanced.
+
+Widgets and transaction table are not aligned neatly.
+
+Metrics displayed currently are limited and require significant expansion.
+
+What you need to do (UI adjustments clearly explained):
+
+Use a clean, grid-based layout with clear spacing and padding (e.g., Tailwind spacing utilities).
+
+Arrange dashboard widgets (e.g., total properties sold, revenue, average price, days on market) neatly in one horizontal line. Ensure they align evenly, have consistent padding, margins, and spacing between each widget.
+
+Below widgets, neatly organize a clear table with property transactions. Ensure columns have consistent widths, good padding, and are clearly readable.
+
+Implement filters (date range, property type, sales agent) horizontally aligned at the top clearly separated from widgets.
+
+Analytics you must include clearly in the dashboard widgets and tables:
+
+📊 Overall Sales Metrics
+Total properties sold (with percentage increase or decrease clearly shown)
+
+Total properties currently under offer or pending
+
+Total revenue (include settled sales and those awaiting settlement)
+
+Average selling price (overall, and segmented clearly by suburb and property type)
+
+📈 Property Performance Analytics
+Average Days on Market clearly shown (listed to sold, and listed to settled)
+
+Property type distribution (percentage clearly shown: houses, units, etc.)
+
+Bedroom and bathroom trends (average prices clearly segmented by number of bedrooms/bathrooms)
+
+🎯 Agent Performance Metrics
+Number of properties sold per agent clearly visible in a sortable format
+
+Revenue generated per agent
+
+Average sale price per agent
+
+Active listings per agent (also clearly highlighting properties currently under offer or pending per agent)
+
+🌏 Suburb & Postcode Analysis
+Total sales and revenue clearly shown per suburb/postcode
+
+Top-performing suburbs clearly highlighted based on sales and average prices
+
+Market activity by suburb clearly displayed (number of sales, average days on market)
+
+📌 Transaction Status Analytics
+Clear breakdown of property statuses (listed, under offer, pending, sold, settled, withdrawn, expired)
+
+Identify suburbs or property types that often see withdrawn or expired listings
+
+💰 Price Distribution & Trends
+Clear graphical distribution (e.g., bar chart) showing sales across different price ranges
+
+Highlight highest and lowest performing properties (price-wise)
+
+🎨 Quick Style Notes for Improvement (using Tailwind & Shadcn UI)
+Dashboard background should be subtle and professional (light grays/whites recommended).
+
+Widget cards should use rounded corners, clear shadows (shadow-md), and subtle hover effects.
+
+Ensure consistent typography—clear font sizing and weights (font-medium, font-semibold) for headings and metrics.
+
+Table rows should have alternating background colors (even:bg-gray-50) for readability.
+
